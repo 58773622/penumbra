@@ -46,7 +46,7 @@ impl AppCtx {
 impl App {
     pub fn new() -> App {
         App {
-            current_page: Box::new(WelcomePage::default()),
+            current_page: Box::new(WelcomePage::new()),
             context: AppCtx::default()
         }
     }
