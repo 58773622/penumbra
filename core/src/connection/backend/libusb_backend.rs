@@ -165,23 +165,6 @@ impl UsbMTKPort {
             pid,
         ))
     }
-
-    async fn check_and_reacquire(&mut self) {
-        let descriptor = self.handle.lock().await.device().device_descriptor();
-        let (vid, pid) = match descriptor {
-            Ok(desc) => (desc.vendor_id(), desc.product_id()),
-            Err(e) => {
-                error!("Failed to get device descriptor: {:?}", e);
-                return;
-            }
-        };
-        if vid != self.vid || pid != self.pid {
-            info!(
-                "Device VID/PID changed from {:04x}:{:04x} to {:04x}:{:04x}, but reacquire not implemented",
-                self.vid, self.pid, vid, pid
-            );
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -291,7 +274,6 @@ impl MTKPort for UsbMTKPort {
     }
 
     async fn read_exact(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.check_and_reacquire().await;
         let handle = self.handle.clone();
         let endpoint = self.in_endpoint;
         let timeout = Duration::from_millis(5000);
@@ -366,7 +348,6 @@ impl MTKPort for UsbMTKPort {
     }
 
     async fn write_all(&mut self, buf: &[u8]) -> Result<()> {
-        self.check_and_reacquire().await;
         let handle = self.handle.clone();
         let endpoint = self.out_endpoint;
         let timeout = Duration::from_millis(5000);

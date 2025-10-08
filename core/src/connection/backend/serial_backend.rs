@@ -4,11 +4,13 @@
 */
 use crate::connection::port::{ConnectionType, KNOWN_PORTS, MTKPort};
 use log::{debug, error, info};
+use std::io::{Error, ErrorKind};
 use tokio::io::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_serial::{
     SerialPort, SerialPortBuilderExt, SerialPortInfo, SerialPortType, SerialStream,
 };
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct SerialMTKPort {
@@ -65,7 +67,7 @@ impl MTKPort for SerialMTKPort {
         if !self.is_open {
             self.port = Some(
                 tokio_serial::new(&self.port_info.port_name, self.baudrate)
-                    .timeout(std::time::Duration::from_millis(1000))
+                    .timeout(Duration::from_millis(1000))
                     .open_native_async()?,
             );
             self.is_open = true;
@@ -89,8 +91,8 @@ impl MTKPort for SerialMTKPort {
         if let Some(port) = &mut self.port {
             port.read_exact(buf).await
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::NotConnected,
+            Err(Error::new(
+                ErrorKind::NotConnected,
                 "Port is not open",
             ))
         }
@@ -100,8 +102,8 @@ impl MTKPort for SerialMTKPort {
         if let Some(port) = &mut self.port {
             port.write_all(buf).await
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::NotConnected,
+            Err(Error::new(
+                ErrorKind::NotConnected,
                 "Port is not open",
             ))
         }
@@ -112,8 +114,8 @@ impl MTKPort for SerialMTKPort {
             port.clear(tokio_serial::ClearBuffer::Input)?;
             Ok(())
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::NotConnected,
+            Err(Error::new(
+                ErrorKind::NotConnected,
                 "Port is not open",
             ))
         }
@@ -136,9 +138,10 @@ impl MTKPort for SerialMTKPort {
             port.write_all(&[0x0A]).await?;
             let mut r1 = [0u8; 1];
             port.read_exact(&mut r1).await?;
-            if r1 != [0xF5] {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+            if r1 != [0xF5]
+             {
+                return Err(Error::new(
+                    ErrorKind::Other,
                     "Handshake failed: Expected 0xF5",
                 ));
             }
@@ -147,26 +150,26 @@ impl MTKPort for SerialMTKPort {
             let mut r2 = [0u8; 1];
             port.read_exact(&mut r2).await?;
             if r2 != [0xAF] {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(Error::new(
+                    ErrorKind::Other,
                     "Handshake failed: Expected 0xAF",
                 ));
             }
 
             port.write_all(&[0x05]).await?;
-            let mut r3 = [0u8; 1]; // ← this was missing
-            port.read_exact(&mut r3).await?; // ← and this
+            let mut r3 = [0u8; 1];
+            port.read_exact(&mut r3).await?;
             if r3 != [0xFA] {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(Error::new(
+                    ErrorKind::Other,
                     "Handshake failed: Expected 0xFA",
                 ));
             }
 
             Ok(())
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::NotConnected,
+            Err(Error::new(
+                ErrorKind::NotConnected,
                 "Port is not open",
             ))
         }
