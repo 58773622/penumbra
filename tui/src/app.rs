@@ -3,6 +3,7 @@
     SPDX-FileCopyrightText: 2025 Shomy
 */
 use crate::pages::{DevicePage, Page, WelcomePage};
+use crate::components::dialog::{Dialog, DialogBuilder};
 use penumbra::da::DAFile;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
@@ -21,7 +22,8 @@ pub struct AppCtx {
     loader: Option<Loader>,
     exit: bool,
     current_page_id: AppPage,
-    next_page_id: Option<AppPage>
+    next_page_id: Option<AppPage>,
+    pub dialog: Option<Dialog>
 }
 
 pub struct App {
@@ -71,6 +73,9 @@ impl AppCtx {
             .and_then(|l| l.loader_name())
             .unwrap_or("Unknown DA".to_string())
     }
+    pub fn set_dialog(&mut self, dialog: &mut DialogBuilder) {
+        self.dialog = Some(dialog.build().expect("Failed to build dialog"));
+    }
     pub fn change_page(&mut self, page: AppPage) {
         self.next_page_id = Some(page);
     }
@@ -112,6 +117,22 @@ impl App {
                     self.context.quit();
                 }
 
+                if let Some(dialog) = &mut self.context.dialog {
+                    match key.code {
+                        KeyCode::Left => dialog.move_left(),
+                        KeyCode::Right => dialog.move_right(),
+                        KeyCode::Enter => {
+                            dialog.press_selected();
+                            self.context.dialog = None;
+                        },
+                        KeyCode::Esc => {
+                            self.context.dialog = None;
+                        },
+                        _ => {}
+                    }
+                    return Ok(());
+                }
+
                 self.current_page.handle_input(&mut self.context, key).await;
             }
         }
@@ -119,7 +140,13 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut Frame<'_>) {
+        let size = frame.area();
+
         self.current_page.render(frame, &mut self.context);
+
+        if let Some(dialog) = &self.context.dialog {
+            dialog.render(size, frame.buffer_mut());
+        }
     }
 
     pub async fn switch_to(&mut self, page: AppPage) {
