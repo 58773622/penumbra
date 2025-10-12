@@ -32,6 +32,7 @@ enum SecCfgV4Algo {
     None,
 }
 
+#[derive(Default)]
 pub struct SecCfgV4 {
     pub seccfg_ver: u32,
     pub seccfg_size: u32,
@@ -39,12 +40,6 @@ pub struct SecCfgV4 {
     pub critical_lock_state: u32,
     pub sboot_runtime: u32,
     algo: Option<SecCfgV4Algo>,
-}
-
-impl Default for SecCfgV4 {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl SecCfgV4 {
