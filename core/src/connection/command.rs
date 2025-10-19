@@ -7,6 +7,7 @@
 */
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Command {
     // Commands used by the Preloader / BROM protocol
     GetHwSwVer = 0xFC,

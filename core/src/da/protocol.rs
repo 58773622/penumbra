@@ -4,7 +4,7 @@
 */
 use crate::connection::Connection;
 use crate::connection::port::ConnectionType;
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 #[async_trait::async_trait]
 pub trait DAProtocol: Send {

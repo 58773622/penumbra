@@ -111,7 +111,7 @@ impl MTKPort for SerialMTKPort {
     async fn flush(&mut self) -> Result<()> {
         if let Some(port) = &mut self.port {
             port.clear(tokio_serial::ClearBuffer::Input)
-                .map_err(|e| Error::Io(e.to_string()));
+                .map_err(|e| Error::Io(e.to_string()))?;
             Ok(())
         } else {
             Err(Error::io("Port is not open"))

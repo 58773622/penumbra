@@ -14,6 +14,7 @@
 */
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Cmd {
     Magic = 0xFEEEEEEF,
     SyncSignal = 0x434E5953,
@@ -107,6 +108,7 @@ pub enum Cmd {
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum DataType {
     ProtocolFlow = 1,
     Message = 2,
