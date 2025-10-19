@@ -12,10 +12,11 @@
     the combined work is subject to the networking terms of the AGPL-3.0-or-later,
     as for term 13 of the GPL-3.0-or-later license.
 */
-use crate::error::{Error, Result};
-use crate::core::utilities::find_pattern;
 use crate::da::DAProtocol;
 use crate::da::xflash::{Cmd, DataType, XFlash};
+use crate::error::{Error, Result};
+use crate::extract_ptr;
+use crate::utilities::patching::{HEX_NOT_FOUND, find_pattern, patch_ptr};
 use log::{debug, info};
 
 const DA_EXT: &[u8] = include_bytes!("../../../payloads/da_x.bin");
@@ -68,156 +69,108 @@ fn prepare_extensions(xflash: &XFlash) -> Option<Vec<u8>> {
     let mut da_ext_data = DA_EXT.to_vec();
 
     // This allows to register DA Extensions custom commands (0x0F000X)
-    let register_devctrl = find_pattern(da2, &[0x38, 0xB5, 0x05, 0x46, 0x0C, 0x20], 0);
-
-    // TODO: Mess below, needs cleanup, consider replacing byte arrays with b"..."
-    let mut mmc_get_card =
-        find_pattern(da2, &[0x4B, 0x4F, 0xF4, 0x3C, 0x72], 0).map(|pos| pos.saturating_sub(1));
-
-    if mmc_get_card.is_none() {
-        mmc_get_card = find_pattern(
-            da2,
-            &[0xA3, 0xEB, 0x00, 0x13, 0x18, 0x1A, 0x02, 0xEB, 0x00, 0x10],
-            0,
-        )
-        .map(|pos| pos.saturating_sub(10));
+    let register_devctrl = find_pattern(da2, "38B505460C20", 0);
+    if register_devctrl == HEX_NOT_FOUND {
+        return None;
     }
 
-    let mut mmc_set_part_config = None;
+    let mmc_get_card = {
+        let pos = find_pattern(da2, "4B4FF43C72", 0);
+        if pos != HEX_NOT_FOUND {
+            pos.saturating_sub(1)
+        } else {
+            let pos = find_pattern(da2, "A3EB0013181A02EB0010", 0);
+            if pos != HEX_NOT_FOUND {
+                pos.saturating_sub(10)
+            } else {
+                return None;
+            }
+        }
+    };
+
+    let mut mmc_set_part_config = HEX_NOT_FOUND;
     let mut search_offset = 0;
 
-    while let Some(pos) = find_pattern(da2, &[0xC3, 0x69, 0x0A, 0x46, 0x10, 0xB5], search_offset) {
-        search_offset = pos + 1;
+    while search_offset < da2.len() {
+        let pos = find_pattern(da2, "C3690A4610B5", search_offset);
+        if pos == HEX_NOT_FOUND {
+            break;
+        }
 
-        if da2.len() >= pos + 22 && da2[pos + 20..pos + 22] == [0xB3, 0x21] {
-            mmc_set_part_config = Some(pos);
+        if pos + 22 <= da2.len() && da2[pos + 20] == 0xB3 && da2[pos + 21] == 0x21 {
+            mmc_set_part_config = pos;
+            break;
+        }
+
+        search_offset = pos + 1;
+    }
+
+    if mmc_set_part_config == HEX_NOT_FOUND {
+        mmc_set_part_config = find_pattern(da2, "C36913F00103", 0);
+    }
+
+    let mut mmc_rpmb_send_command = find_pattern(da2, "F8B506469DF81850", 0);
+    if mmc_rpmb_send_command == HEX_NOT_FOUND {
+        mmc_rpmb_send_command = find_pattern(da2, "2DE9F0414FF6FD74", 0);
+    }
+
+    let ufs_patterns = [
+        ("20460BB0BDE8F08300BF", 10),
+        ("20460DB0BDE8F083", 8),
+        ("214602F002FB1BE600BF", 18),
+    ];
+
+    let mut g_ufs_hba = 0;
+
+    for (pattern, offset) in ufs_patterns {
+        let pos = find_pattern(da2, pattern, 0);
+        if pos != HEX_NOT_FOUND && pos + offset + 4 <= da2.len() {
+            g_ufs_hba = extract_ptr!(u32, da2, pos + offset);
             break;
         }
     }
 
-    if mmc_set_part_config.is_none() {
-        mmc_set_part_config = find_pattern(da2, &[0xC3, 0x69, 0x13, 0xF0, 0x01, 0x03], 0);
-    }
+    let has_ufs = g_ufs_hba != 0;
 
-    let mmc_rpmb_send_command =
-        find_pattern(da2, &[0xF8, 0xB5, 0x06, 0x46, 0x9D, 0xF8, 0x18, 0x50], 0)
-            .or_else(|| find_pattern(da2, &[0x2D, 0xE9, 0xF0, 0x41, 0x4F, 0xF6, 0xFD, 0x74], 0));
-
-    let mut g_ufs_hba = None;
-    let mut ptr_g_ufs_hba = find_pattern(
-        da2,
-        &[0x20, 0x46, 0x0B, 0xB0, 0xBD, 0xE8, 0xF0, 0x83, 0x00, 0xBF],
-        0,
-    );
-
-    if let Some(ptr) = ptr_g_ufs_hba {
-        if da2.len() >= ptr + 14 {
-            g_ufs_hba = Some(u32::from_le_bytes([
-                da2[ptr + 10],
-                da2[ptr + 11],
-                da2[ptr + 12],
-                da2[ptr + 13],
-            ]));
-        }
+    let ufs_tag_pos = if has_ufs {
+        find_pattern(da2, "B52EB190F8", 0)
     } else {
-        ptr_g_ufs_hba = find_pattern(da2, &[0x20, 0x46, 0x0D, 0xB0, 0xBD, 0xE8, 0xF0, 0x83], 0);
-
-        if let Some(ptr) = ptr_g_ufs_hba {
-            if da2.len() >= ptr + 12 {
-                g_ufs_hba = Some(u32::from_le_bytes([
-                    da2[ptr + 8],
-                    da2[ptr + 9],
-                    da2[ptr + 10],
-                    da2[ptr + 11],
-                ]));
-            }
-        } else {
-            ptr_g_ufs_hba = find_pattern(
-                da2,
-                &[0x21, 0x46, 0x02, 0xF0, 0x02, 0xFB, 0x1B, 0xE6, 0x00, 0xBF],
-                0,
-            );
-
-            if let Some(ptr) = ptr_g_ufs_hba {
-                if da2.len() >= ptr + 22 {
-                    g_ufs_hba = Some(u32::from_le_bytes([
-                        da2[ptr + 18],
-                        da2[ptr + 19],
-                        da2[ptr + 20],
-                        da2[ptr + 21],
-                    ]));
-                }
-            }
-        }
-    }
-
-    let (ufshcd_get_free_tag, ufshcd_queuecommand) = if ptr_g_ufs_hba.is_some() {
-        (
-            find_pattern(da2, &[0xB5, 0x2E, 0xB1, 0x90, 0xF8], 0),
-            find_pattern(da2, &[0x2D, 0xE9, 0xF8, 0x43, 0x01, 0x27], 0),
-        )
-    } else {
-        (None, None)
+        HEX_NOT_FOUND
     };
 
-    // Actual patching starts here btw
-    let register_ptr = find_pattern(&da_ext_data, &[0x11, 0x11, 0x11, 0x11], 0);
-    let mmc_get_card_ptr = find_pattern(&da_ext_data, &[0x22, 0x22, 0x22, 0x22], 0);
-    let mmc_set_part_config_ptr = find_pattern(&da_ext_data, &[0x33, 0x33, 0x33, 0x33], 0);
-    let mmc_rpmb_send_command_ptr = find_pattern(&da_ext_data, &[0x44, 0x44, 0x44, 0x44], 0);
-    let ufshcd_queuecommand_ptr = find_pattern(&da_ext_data, &[0x55, 0x55, 0x55, 0x55], 0);
-    let ufshcd_get_free_tag_ptr = find_pattern(&da_ext_data, &[0x66, 0x66, 0x66, 0x66], 0);
-    let ptr_g_ufs_hba_ptr = find_pattern(&da_ext_data, &[0x77, 0x77, 0x77, 0x77], 0);
-    // let efuse_addr_ptr = find_pattern(&da_ext_data, &[0x88, 0x88, 0x88, 0x88], 0);
+    let ufs_queue_pos = if has_ufs {
+        find_pattern(da2, "2DE9F8430127", 0)
+    } else {
+        HEX_NOT_FOUND
+    };
 
-    if let (Some(register_ptr), Some(mmc_get_card_ptr)) = (register_ptr, mmc_get_card_ptr) {
-        let register_devctrl = register_devctrl
-            .map(|val| (val as u32 + da2address) | 1)
-            .unwrap_or(0);
-        let mmc_get_card = mmc_get_card
-            .map(|val| (val as u32 + da2address) | 1)
-            .unwrap_or(0);
-        let mmc_set_part_config = mmc_set_part_config
-            .map(|val| (val as u32 + da2address) | 1)
-            .unwrap_or(0);
-        let mmc_rpmb_send_command = mmc_rpmb_send_command
-            .map(|val| (val as u32 + da2address) | 1)
-            .unwrap_or(0);
+    // Actual patching starts here
+    let register_ptr = find_pattern(&da_ext_data, "11111111", 0);
+    let mmc_get_card_ptr = find_pattern(&da_ext_data, "22222222", 0);
+    let mmc_set_part_config_ptr = find_pattern(&da_ext_data, "33333333", 0);
+    let mmc_rpmb_send_command_ptr = find_pattern(&da_ext_data, "44444444", 0);
+    let ufshcd_queuecommand_ptr = find_pattern(&da_ext_data, "55555555", 0);
+    let ufshcd_get_free_tag_ptr = find_pattern(&da_ext_data, "66666666", 0);
+    let ptr_g_ufs_hba_ptr = find_pattern(&da_ext_data, "77777777", 0);
+    // let efuse_addr_ptr = find_pattern(&da_ext_data, "88888888", 0);
 
-        let ufshcd_get_free_tag = ufshcd_get_free_tag
-            .map(|val| (val as u32 + da2address - 1) | 1)
-            .unwrap_or(0);
+    let patches = [
+        (register_ptr, register_devctrl),
+        (mmc_get_card_ptr, mmc_get_card),
+        (mmc_set_part_config_ptr, mmc_set_part_config),
+        (mmc_rpmb_send_command_ptr, mmc_rpmb_send_command),
+        (ufshcd_queuecommand_ptr, ufs_queue_pos),
+        (ufshcd_get_free_tag_ptr, ufs_tag_pos),
+        (ptr_g_ufs_hba_ptr, g_ufs_hba as usize),
+    ];
 
-        let ufshcd_queuecommand = ufshcd_queuecommand
-            .map(|val| (val as u32 + da2address) | 1)
-            .unwrap_or(0);
-
-        let g_ufs_hba = g_ufs_hba.unwrap_or(0);
-
-        da_ext_data[register_ptr..register_ptr + 4]
-            .copy_from_slice(&(register_devctrl.to_le_bytes()));
-        da_ext_data[mmc_get_card_ptr..mmc_get_card_ptr + 4]
-            .copy_from_slice(&(mmc_get_card.to_le_bytes()));
-        if let Some(p) = mmc_set_part_config_ptr {
-            da_ext_data[p..p + 4].copy_from_slice(&(mmc_set_part_config.to_le_bytes()));
+    for (offset, value) in patches {
+        if offset != HEX_NOT_FOUND && value != HEX_NOT_FOUND {
+            patch_ptr(&mut da_ext_data, offset, value as u32, da2address, true);
         }
-        if let Some(p) = mmc_rpmb_send_command_ptr {
-            da_ext_data[p..p + 4].copy_from_slice(&(mmc_rpmb_send_command.to_le_bytes()));
-        }
-        if let Some(p) = ufshcd_get_free_tag_ptr {
-            da_ext_data[p..p + 4].copy_from_slice(&(ufshcd_get_free_tag.to_le_bytes()));
-        }
-        if let Some(p) = ufshcd_queuecommand_ptr {
-            da_ext_data[p..p + 4].copy_from_slice(&(ufshcd_queuecommand.to_le_bytes()));
-        }
-        if let Some(p) = ptr_g_ufs_hba_ptr {
-            da_ext_data[p..p + 4].copy_from_slice(&(g_ufs_hba.to_le_bytes()));
-        }
-        // TODO: Add efuse address
-
-        return Some(da_ext_data);
     }
-    None
+
+    Some(da_ext_data)
 }
 
 // TODO: Rewrite these
