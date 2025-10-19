@@ -83,7 +83,7 @@ pub fn parse_gpt(data: &[u8], storage_type: StorageType) -> Result<Vec<Partition
     }
 
     let sector_size = match sector_size {
-        Some(size) => 512,
+        Some(size) => size,
         None => {
             return Err(Error::penumbra("No valid GPT header found"));
         }
