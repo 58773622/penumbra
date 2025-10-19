@@ -2,16 +2,23 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     naersk.url = "github:nix-community/naersk";
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
   outputs = {
     self,
     nixpkgs,
     naersk,
+    rust-overlay,
   }: let
     system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
-    naerskLib = pkgs.callPackage naersk {};
+    pkgs = import nixpkgs {
+      inherit system;
+      overlays = [rust-overlay.overlays.default];
+    };
+
+    rustToolchain = pkgs.rust-bin.nightly.latest.default;
+    naerskLib = pkgs.callPackage naersk {inherit rustToolchain;};
   in {
     packages.${system}.default = naerskLib.buildPackage {
       src = ./.;
@@ -23,22 +30,17 @@
 
     devShells.${system}.default = pkgs.mkShell {
       packages = [
-        pkgs.rustfmt
-        pkgs.clippy
+        rustToolchain
+        pkgs.rust-analyzer
       ];
 
       buildInputs = with pkgs; [
-        cargo
-        rustc
-        rust-analyzer
         glib
 
         systemd.dev
       ];
 
       nativeBuildInputs = [pkgs.pkg-config pkgs.libusb1];
-
-      env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
     };
   };
 }
