@@ -151,7 +151,7 @@ impl DAFile {
     pub fn get_da_from_hw_code(&self, hw_code: u16) -> Option<DA> {
         let da_code = match hw_code {
             0x0707 => 0x6768,
-            _ => return None,
+            _ => hw_code,
         };
 
         // I did the clone, I'm sorry!
