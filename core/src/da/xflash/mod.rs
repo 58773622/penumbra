@@ -237,6 +237,7 @@ impl DAProtocol for XFlash {
         debug!("[RX] Status: 0x{:08X}", status);
         match status {
             0 => Ok(status),
+            sync if sync == Cmd::SyncSignal as u32 => Ok(status),
             _ => Err(Error::XFlash(XFlashError::from_code(status))),
         }
     }
