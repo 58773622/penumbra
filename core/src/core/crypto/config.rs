@@ -27,9 +27,11 @@ impl<'a> CryptoConfig<'a> {
     pub fn new(sej_base: u32, io: &'a mut dyn CryptoIO) -> Self {
         Self { sej_base, io }
     }
+
     pub async fn read32(&mut self, addr: u32) -> u32 {
         self.io.read32(addr).await
     }
+
     pub async fn write32(&mut self, addr: u32, val: u32) {
         self.io.write32(addr, val).await
     }

@@ -3,13 +3,14 @@
     SPDX-FileCopyrightText: 2025 Shomy
 */
 
-use crate::error::Result;
 use std::fmt::Debug;
 
+use crate::error::Result;
+
 pub const KNOWN_PORTS: &[(u16, u16)] = &[
-    (0x0e8d, 0x0003), // Mediatek USB Port (BROM)
-    (0x0e8d, 0x2000), // Mediatek USB Port (Preloader)
-    (0x0e8d, 0x2001), // Mediatek USB Port (DA)
+    (0x0E8D, 0x0003), // Mediatek USB Port (BROM)
+    (0x0E8D, 0x2000), // Mediatek USB Port (Preloader)
+    (0x0E8D, 0x2001), // Mediatek USB Port (DA)
 ];
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -52,9 +53,10 @@ pub async fn find_mtk_port() -> Option<Box<dyn MTKPort>> {
 
     #[cfg(feature = "libusb")]
     {
-        use crate::connection::backend::libusb_backend::UsbMTKPort;
         use rusb::{Context, UsbContext};
         use tokio::task;
+
+        use crate::connection::backend::libusb_backend::UsbMTKPort;
 
         let usb_ports = task::spawn_blocking(|| {
             let context = Context::new().ok()?;

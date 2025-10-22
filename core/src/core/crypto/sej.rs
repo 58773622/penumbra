@@ -12,10 +12,13 @@
     the combined work is subject to the networking terms of the AGPL-3.0-or-later,
     as for term 13 of the GPL-3.0-or-later license.
 */
-use crate::core::crypto::config::CryptoConfig;
 use aes::Aes128;
-use cbc::{Decryptor, Encryptor}; // TODO: Recheck this crate, as it doesn't receive stable updates for 3+ years
-use cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
+use cbc::{Decryptor, Encryptor}; /* TODO: Recheck this crate, as it doesn't receive stable
+                                   * updates for 3+ years */
+use cipher::block_padding::Pkcs7;
+use cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
+
+use crate::core::crypto::config::CryptoConfig;
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug)]
@@ -145,10 +148,7 @@ impl<'a> SEJCrypto<'a> {
         if encrypt {
             let cipher = Encryptor::<Aes128>::new_from_slices(DEFAULT_KEY, DEFAULT_IV)
                 .expect("Invalid key/IV");
-            cipher
-                .encrypt_padded_mut::<Pkcs7>(&mut buf, buf_len)
-                .expect("Encrypt failed")
-                .to_vec()
+            cipher.encrypt_padded_mut::<Pkcs7>(&mut buf, buf_len).expect("Encrypt failed").to_vec()
         } else {
             let cipher = Decryptor::<Aes128>::new_from_slices(DEFAULT_KEY, DEFAULT_IV)
                 .expect("Invalid key/IV");
@@ -295,12 +295,9 @@ impl<'a> SEJCrypto<'a> {
             for i in 0..3 {
                 let pos = i * 4;
                 self.wreg(SejReg::ASRC0, G_CFG_RANDOM_PATTERN[pos]).await;
-                self.wreg(SejReg::ASRC1, G_CFG_RANDOM_PATTERN[pos + 1])
-                    .await;
-                self.wreg(SejReg::ASRC2, G_CFG_RANDOM_PATTERN[pos + 2])
-                    .await;
-                self.wreg(SejReg::ASRC3, G_CFG_RANDOM_PATTERN[pos + 3])
-                    .await;
+                self.wreg(SejReg::ASRC1, G_CFG_RANDOM_PATTERN[pos + 1]).await;
+                self.wreg(SejReg::ASRC2, G_CFG_RANDOM_PATTERN[pos + 2]).await;
+                self.wreg(SejReg::ASRC3, G_CFG_RANDOM_PATTERN[pos + 3]).await;
                 self.wreg(SejReg::ACON2, SEJ_AES_START).await;
                 for _ in 0..20 {
                     if self.rreg(SejReg::ACON2).await & SEJ_AES_RDY != 0 {

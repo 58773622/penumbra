@@ -2,13 +2,16 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     SPDX-FileCopyrightText: 2025 Shomy
 */
-use crate::pages::{DevicePage, Page, WelcomePage};
-use crate::components::dialog::{Dialog, DialogBuilder};
+use std::io::Result;
+use std::path::PathBuf;
+use std::time::Duration;
+
 use penumbra::da::DAFile;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
-use std::path::PathBuf;
-use std::{io::Result, time::Duration};
+
+use crate::components::dialog::{Dialog, DialogBuilder};
+use crate::pages::{DevicePage, Page, WelcomePage};
 
 #[derive(PartialEq, Clone, Copy, Default)]
 pub enum AppPage {
@@ -23,7 +26,7 @@ pub struct AppCtx {
     exit: bool,
     current_page_id: AppPage,
     next_page_id: Option<AppPage>,
-    pub dialog: Option<Dialog>
+    pub dialog: Option<Dialog>,
 }
 
 pub struct App {
@@ -33,25 +36,23 @@ pub struct App {
 
 pub struct Loader {
     path: PathBuf,
-    file: DAFile
+    file: DAFile,
 }
 impl Loader {
     pub fn new(path: PathBuf, file: DAFile) -> Self {
-        Self {
-            path,
-            file
-        }
+        Self { path, file }
     }
+
     pub fn file(&self) -> &DAFile {
         &self.file
     }
+
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
+
     pub fn loader_name(&self) -> Option<String> {
-        self.path().file_name()
-            .and_then(|name| name.to_str())
-            .map(|s| s.to_string())
+        self.path().file_name().and_then(|name| name.to_str()).map(|s| s.to_string())
     }
 }
 
@@ -59,6 +60,7 @@ impl AppCtx {
     pub fn loader(&self) -> Option<&Loader> {
         self.loader.as_ref()
     }
+
     pub fn set_loader(&mut self, loader_path: PathBuf, loader_file: DAFile) {
         if let Some(loader) = self.loader.as_mut() {
             loader.path = loader_path;
@@ -67,18 +69,19 @@ impl AppCtx {
             self.loader = Some(Loader::new(loader_path, loader_file));
         }
     }
+
     pub fn loader_name(&self) -> String {
-        self.loader
-            .as_ref()
-            .and_then(|l| l.loader_name())
-            .unwrap_or("Unknown DA".to_string())
+        self.loader.as_ref().and_then(|l| l.loader_name()).unwrap_or("Unknown DA".to_string())
     }
+
     pub fn set_dialog(&mut self, dialog: &mut DialogBuilder) {
         self.dialog = Some(dialog.build().expect("Failed to build dialog"));
     }
+
     pub fn change_page(&mut self, page: AppPage) {
         self.next_page_id = Some(page);
     }
+
     pub fn quit(&mut self) {
         self.exit = true;
     }
@@ -86,10 +89,7 @@ impl AppCtx {
 
 impl App {
     pub fn new() -> App {
-        App {
-            current_page: Box::new(WelcomePage::new()),
-            context: AppCtx::default()
-        }
+        App { current_page: Box::new(WelcomePage::new()), context: AppCtx::default() }
     }
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -112,8 +112,7 @@ impl App {
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 // Force exit: [Ctrl + Delete]
-                if key.code == KeyCode::Delete && key.modifiers.contains(KeyModifiers::CONTROL)
-                {
+                if key.code == KeyCode::Delete && key.modifiers.contains(KeyModifiers::CONTROL) {
                     self.context.quit();
                 }
 
@@ -124,10 +123,10 @@ impl App {
                         KeyCode::Enter => {
                             dialog.press_selected();
                             self.context.dialog = None;
-                        },
+                        }
                         KeyCode::Esc => {
                             self.context.dialog = None;
-                        },
+                        }
                         _ => {}
                     }
                     return Ok(());

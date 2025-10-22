@@ -34,10 +34,7 @@ fn parse_pattern(input: &str) -> Result<HexPattern> {
 }
 
 fn pattern_matches(window: &[u8], pattern: &HexPattern) -> bool {
-    pattern
-        .iter()
-        .zip(window)
-        .all(|(p, &b)| p.map_or(true, |v| v == b))
+    pattern.iter().zip(window).all(|(p, &b)| p.map_or(true, |v| v == b))
 }
 
 /// Checks if a data window matches the given pattern, considering wildcards.

@@ -2,15 +2,25 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     SPDX-FileCopyrightText: 2025 Shomy
 */
-use crate::connection::port::{ConnectionType, KNOWN_PORTS, MTKPort};
-use crate::error::{Error, Result};
-use log::{debug, error, info};
-use rusb::{Context, Device, DeviceHandle, GlobalContext, UsbContext};
-use rusb::{Direction, Recipient, RequestType};
 use std::sync::Arc;
 use std::time::Duration;
+
+use log::{debug, error, info};
+use rusb::{
+    Context,
+    Device,
+    DeviceHandle,
+    Direction,
+    GlobalContext,
+    Recipient,
+    RequestType,
+    UsbContext,
+};
 use tokio::sync::Mutex;
 use tokio::task;
+
+use crate::connection::port::{ConnectionType, KNOWN_PORTS, MTKPort};
+use crate::error::{Error, Result};
 
 #[derive(Debug, Clone)]
 pub struct UsbMTKPort {
@@ -134,9 +144,9 @@ impl UsbMTKPort {
         let (vid, pid) = (descriptor.vendor_id(), descriptor.product_id());
 
         let connection_type = match (vid, pid) {
-            (0x0e8d, 0x0003) => ConnectionType::Brom,
-            (0x0e8d, 0x2000) => ConnectionType::Preloader,
-            (0x0e8d, 0x2001) => ConnectionType::Da,
+            (0x0E8D, 0x0003) => ConnectionType::Brom,
+            (0x0E8D, 0x2000) => ConnectionType::Preloader,
+            (0x0E8D, 0x2001) => ConnectionType::Da,
             _ => return None,
         };
 
@@ -246,10 +256,7 @@ impl MTKPort for UsbMTKPort {
                 }
 
                 if let Err(e) = handle.attach_kernel_driver(iface) {
-                    error!(
-                        "Failed to reattach kernel driver on interface {}: {:?}",
-                        iface, e
-                    );
+                    error!("Failed to reattach kernel driver on interface {}: {:?}", iface, e);
                 }
             }
 

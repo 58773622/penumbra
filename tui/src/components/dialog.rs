@@ -19,7 +19,7 @@ pub enum DialogType {
     Info,
     #[strum(serialize = "[o] DIALOG")]
     #[default]
-    Other
+    Other,
 }
 
 pub struct DialogButton {
@@ -30,36 +30,27 @@ pub struct DialogButton {
 impl DialogButton {
     pub fn new<F>(title: &str, action: F) -> Self
     where
-        F: FnMut() + Send + 'static
+        F: FnMut() + Send + 'static,
     {
-        Self {
-            title: title.to_string(),
-            action: Box::new(action),
-        }
+        Self { title: title.to_string(), action: Box::new(action) }
     }
 }
 
 impl Clone for DialogButton {
     fn clone(&self) -> Self {
-        Self {
-            title: self.title.clone(),
-            action: Box::new(|| {}),
-        }
+        Self { title: self.title.clone(), action: Box::new(|| {}) }
     }
 }
 
 #[derive(Clone)]
 pub struct DialogColors {
     title_color: Color,
-    bg_color: Color
+    bg_color: Color,
 }
 
 impl DialogColors {
     pub fn new(title_color: Color, bg_color: Color) -> Self {
-        Self {
-            title_color,
-            bg_color,
-        }
+        Self { title_color, bg_color }
     }
 }
 
@@ -73,7 +64,7 @@ pub struct Dialog {
     pub buttons: Vec<DialogButton>,
     #[builder(default)]
     pub selected: usize,
-    pub colors: DialogColors
+    pub colors: DialogColors,
 }
 
 impl Dialog {
@@ -88,7 +79,10 @@ impl Dialog {
         Self::clean_area(&dialog_area, buf, Color::Black);
 
         let block = Block::default()
-            .title(Span::styled(self.dialog_type.as_ref(), Style::default().fg(self.colors.title_color)))
+            .title(Span::styled(
+                self.dialog_type.as_ref(),
+                Style::default().fg(self.colors.title_color),
+            ))
             .borders(Borders::ALL)
             .style(Style::default().bg(self.colors.bg_color).fg(Color::White));
 
@@ -126,8 +120,13 @@ impl Dialog {
 
     fn clean_area(area: &Rect, buffer: &mut Buffer, bg_color: Color) {
         for y in area.y..area.y + area.height {
-            buffer.set_stringn(area.x, y, " ".repeat(area.width as usize), area.width as usize,
-                Style::default().bg(bg_color));
+            buffer.set_stringn(
+                area.x,
+                y,
+                " ".repeat(area.width as usize),
+                area.width as usize,
+                Style::default().bg(bg_color),
+            );
         }
     }
 }

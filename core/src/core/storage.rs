@@ -58,12 +58,7 @@ pub struct Partition {
 
 impl Partition {
     pub fn new(name: &str, size: usize, address: u64, kind: PartitionKind) -> Self {
-        Self {
-            name: name.to_string(),
-            size,
-            address,
-            kind,
-        }
+        Self { name: name.to_string(), size, address, kind }
     }
 }
 

@@ -2,8 +2,9 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     SPDX-FileCopyrightText: 2025 Shomy
 */
-use crate::error::{Error, Result};
 use log::debug;
+
+use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DAType {
@@ -51,14 +52,10 @@ impl DAFile {
         };
 
         if da_type != DAType::Legacy && !hdr.windows(0x12).any(|w| w == b"MTK_DOWNLOAD_AGENT") {
-            return Err(Error::penumbra(
-                "Invalid DA file: Missing MTK_DOWNLOAD_AGENT signature",
-            ));
+            return Err(Error::penumbra("Invalid DA file: Missing MTK_DOWNLOAD_AGENT signature"));
         }
 
-        let _da_id = String::from_utf8_lossy(&hdr[0x20..0x60])
-            .trim_end_matches('\0')
-            .to_string();
+        let _da_id = String::from_utf8_lossy(&hdr[0x20..0x60]).trim_end_matches('\0').to_string();
         let _version = u32::from_le_bytes(hdr[0x60..0x64].try_into().unwrap());
         let num_socs = u32::from_le_bytes(hdr[0x68..0x6C].try_into().unwrap());
         let _magic_number = &hdr[0x64..0x68];
@@ -126,13 +123,7 @@ impl DAFile {
                 current_region_offset += 20; // Move to the next region header
             }
 
-            das.push(DA {
-                da_type: da_type.clone(),
-                regions,
-                magic,
-                hw_code,
-                hw_sub_code,
-            });
+            das.push(DA { da_type: da_type.clone(), regions, magic, hw_code, hw_sub_code });
             debug!(
                 "Parsed DA entry: hw_code={:04X}, hw_sub_code={:04X}, regions={}",
                 hw_code, hw_sub_code, region_count
@@ -161,18 +152,10 @@ impl DAFile {
 
 impl DA {
     pub fn get_da1(&self) -> Option<&DAEntryRegion> {
-        if self.regions.len() >= 3 {
-            Some(&self.regions[1])
-        } else {
-            None
-        }
+        if self.regions.len() >= 3 { Some(&self.regions[1]) } else { None }
     }
 
     pub fn get_da2(&self) -> Option<&DAEntryRegion> {
-        if self.regions.len() >= 3 {
-            Some(&self.regions[2])
-        } else {
-            None
-        }
+        if self.regions.len() >= 3 { Some(&self.regions[2]) } else { None }
     }
 }

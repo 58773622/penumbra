@@ -5,10 +5,11 @@
 mod backend;
 mod command;
 pub mod port;
+use log::{debug, error, info};
+
 use crate::connection::command::Command;
 use crate::connection::port::{ConnectionType, MTKPort};
 use crate::error::{Error, Result};
-use log::{debug, error, info};
 
 #[derive(Debug)]
 pub struct Connection {
@@ -22,11 +23,7 @@ impl Connection {
         let connection_type = port.get_connection_type();
         let baudrate = port.get_baudrate();
 
-        Connection {
-            port,
-            connection_type,
-            baudrate,
-        }
+        Connection { port, connection_type, baudrate }
     }
 
     pub async fn write(&mut self, data: &[u8], size: usize) -> Result<Vec<u8>> {
@@ -40,10 +37,7 @@ impl Connection {
         if data == expected_data {
             Ok(())
         } else {
-            error!(
-                "Data mismatch. Expected: {:x?}, Got: {:x?}",
-                expected_data, data
-            );
+            error!("Data mismatch. Expected: {:x?}, Got: {:x?}", expected_data, data);
             Err(Error::conn("Data mismatch"))
         }
     }
@@ -117,10 +111,7 @@ impl Connection {
         let status_val = u16::from_be_bytes(status);
         debug!("Received final status: 0x{:04X}", status_val);
         if status_val != 0 {
-            error!(
-                "SendDA data transfer failed with status: {:04X}",
-                status_val
-            );
+            error!("SendDA data transfer failed with status: {:04X}", status_val);
             return Err(Error::conn("SendDA data transfer failed"));
         }
 

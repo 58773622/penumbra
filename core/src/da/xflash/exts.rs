@@ -12,12 +12,13 @@
     the combined work is subject to the networking terms of the AGPL-3.0-or-later,
     as for term 13 of the GPL-3.0-or-later license.
 */
+use log::{debug, info};
+
 use crate::da::DAProtocol;
 use crate::da::xflash::{Cmd, DataType, XFlash};
 use crate::error::{Error, Result};
 use crate::extract_ptr;
 use crate::utilities::patching::{HEX_NOT_FOUND, find_pattern, patch_ptr};
-use log::{debug, info};
 
 const DA_EXT: &[u8] = include_bytes!("../../../payloads/da_x.bin");
 
@@ -30,10 +31,7 @@ pub async fn boot_extensions(xflash: &mut XFlash) -> Result<bool> {
     let ext_addr = 0x68000000;
     let ext_size = ext_data.len() as u32;
 
-    info!(
-        "Uploading DA extensions to {:08X} ({} bytes)",
-        ext_addr, ext_size
-    );
+    info!("Uploading DA extensions to {:08X} ({} bytes)", ext_addr, ext_size);
     match xflash.boot_to(ext_addr, &ext_data).await {
         Ok(_) => {}
         // If DA extensions fail to upload, we just return false, not a fatal error
@@ -46,10 +44,7 @@ pub async fn boot_extensions(xflash: &mut XFlash) -> Result<bool> {
     let ack = xflash.devctrl(Cmd::ExtAck, None).await?;
     let status = xflash.get_status().await?;
     if status != 0 {
-        return Err(Error::proto(format!(
-            "DA extensions failed to start: {:#X}",
-            status
-        )));
+        return Err(Error::proto(format!("DA extensions failed to start: {:#X}", status)));
     }
 
     // Ack must be 0xA1A2A3A4
@@ -114,11 +109,8 @@ fn prepare_extensions(xflash: &XFlash) -> Option<Vec<u8>> {
         mmc_rpmb_send_command = find_pattern(da2, "2DE9F0414FF6FD74", 0);
     }
 
-    let ufs_patterns = [
-        ("20460BB0BDE8F08300BF", 10),
-        ("20460DB0BDE8F083", 8),
-        ("214602F002FB1BE600BF", 18),
-    ];
+    let ufs_patterns =
+        [("20460BB0BDE8F08300BF", 10), ("20460DB0BDE8F083", 8), ("214602F002FB1BE600BF", 18)];
 
     let mut g_ufs_hba = 0;
 
@@ -132,17 +124,9 @@ fn prepare_extensions(xflash: &XFlash) -> Option<Vec<u8>> {
 
     let has_ufs = g_ufs_hba != 0;
 
-    let ufs_tag_pos = if has_ufs {
-        find_pattern(da2, "B52EB190F8", 0)
-    } else {
-        HEX_NOT_FOUND
-    };
+    let ufs_tag_pos = if has_ufs { find_pattern(da2, "B52EB190F8", 0) } else { HEX_NOT_FOUND };
 
-    let ufs_queue_pos = if has_ufs {
-        find_pattern(da2, "2DE9F8430127", 0)
-    } else {
-        HEX_NOT_FOUND
-    };
+    let ufs_queue_pos = if has_ufs { find_pattern(da2, "2DE9F8430127", 0) } else { HEX_NOT_FOUND };
 
     // Actual patching starts here
     let register_ptr = find_pattern(&da_ext_data, "11111111", 0);
@@ -201,10 +185,7 @@ pub async fn read32_ext(xflash: &mut XFlash, addr: u32) -> Result<u32> {
     if payload.len() >= 4 {
         let status = xflash.get_status().await?;
         if status != 0 {
-            return Err(Error::proto(format!(
-                "ExtReadRegister failed: {:#X}",
-                status
-            )));
+            return Err(Error::proto(format!("ExtReadRegister failed: {:#X}", status)));
         }
         Ok(u32::from_le_bytes(payload[0..4].try_into().unwrap()))
     } else {
@@ -250,10 +231,7 @@ pub async fn write32_ext(xflash: &mut XFlash, addr: u32, value: u32) -> Result<(
 
     let status = xflash.get_status().await?;
     if status != 0 {
-        return Err(Error::proto(format!(
-            "ExtWriteRegister failed: {:#X}",
-            status
-        )));
+        return Err(Error::proto(format!("ExtWriteRegister failed: {:#X}", status)));
     }
 
     Ok(())

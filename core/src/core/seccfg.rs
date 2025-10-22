@@ -12,9 +12,11 @@
     the combined work is subject to the networking terms of the AGPL-3.0-or-later,
     as for term 13 of the GPL-3.0-or-later license.
 */
-use crate::core::crypto::sej::SEJCrypto;
-use sha2::{Digest, Sha256};
 use std::io::{Error, ErrorKind};
+
+use sha2::{Digest, Sha256};
+
+use crate::core::crypto::sej::SEJCrypto;
 
 const V4_MAGIC_BEGIN: u32 = 0x4D4D4D4D;
 const V4_MAGIC_END: u32 = 0x45454545;
@@ -73,10 +75,7 @@ impl SecCfgV4 {
 
         let hash_start = seccfg_size as usize - 32;
         if data.len() < hash_start + 32 {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                "Data too short for hash",
-            ));
+            return Err(Error::new(ErrorKind::InvalidData, "Data too short for hash"));
         }
         let hash = &data[hash_start..hash_start + 32];
 
@@ -99,12 +98,8 @@ impl SecCfgV4 {
         if hash == calculated_hash.as_slice() {
             matched_algo = Some(SecCfgV4Algo::None);
         } else {
-            for algo in [
-                SecCfgV4Algo::SW,
-                SecCfgV4Algo::HW,
-                SecCfgV4Algo::HWv3,
-                SecCfgV4Algo::HWv4,
-            ] {
+            for algo in [SecCfgV4Algo::SW, SecCfgV4Algo::HW, SecCfgV4Algo::HWv3, SecCfgV4Algo::HWv4]
+            {
                 let dec_hash = match algo {
                     SecCfgV4Algo::SW => sej.sej_seccfg_sw(hash, false),
                     SecCfgV4Algo::HW => sej.sej_seccfg_hw(hash, false, false).await,

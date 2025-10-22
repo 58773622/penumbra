@@ -2,18 +2,19 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 SPDX-FileCopyrightText: 2025 Shomy
 */
-use crate::connection::port::MTKPort;
-use crate::connection::{Connection, port::ConnectionType};
+use std::sync::Arc;
+
+use log::{error, info, warn};
+use tokio::sync::Mutex;
+
+use crate::connection::Connection;
+use crate::connection::port::{ConnectionType, MTKPort};
 use crate::core::crypto::config::{CryptoConfig, CryptoIO};
 use crate::core::crypto::sej::SEJCrypto;
-use crate::error::{Error, Result};
-use crate::core::seccfg::LockFlag;
-use crate::core::seccfg::SecCfgV4;
+use crate::core::seccfg::{LockFlag, SecCfgV4};
 use crate::core::storage::{Partition, StorageType, parse_gpt};
 use crate::da::{DAFile, DAProtocol, DAType, XFlash};
-use log::{error, info, warn};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::error::{Error, Result};
 
 #[derive(Clone, Debug)]
 pub struct DeviceInfo {
@@ -48,6 +49,7 @@ impl CryptoIO for Device<'_> {
             0
         }
     }
+
     async fn write32(&mut self, addr: u32, val: u32) {
         if let Some(protocol) = &mut self.protocol {
             if let Err(e) = protocol.write32(addr, val).await {
@@ -179,9 +181,7 @@ impl<'a> Device<'a> {
         };
 
         let protocol = self.protocol.as_mut().unwrap();
-        protocol
-            .read_flash(partition.address, partition.size, progress)
-            .await
+        protocol.read_flash(partition.address, partition.size, progress).await
     }
 
     pub async fn write_partition(
@@ -222,9 +222,7 @@ impl<'a> Device<'a> {
         }
 
         let protocol = self.protocol.as_mut().unwrap();
-        protocol
-            .write_flash(partition.address, data.len(), data, progress)
-            .await
+        protocol.write_flash(partition.address, data.len(), data, progress).await
     }
 
     pub fn get_connection(&mut self) -> Result<&mut Connection> {
@@ -263,9 +261,7 @@ impl<'a> Device<'a> {
             seccfg.create(&mut sej, lock_state).await
         };
 
-        self.write_partition("seccfg", &new_seccfg, &mut progress)
-            .await
-            .ok()?;
+        self.write_partition("seccfg", &new_seccfg, &mut progress).await.ok()?;
         Some(new_seccfg)
     }
 }

@@ -5,11 +5,11 @@
 pub mod device;
 pub mod welcome;
 pub use device::DevicePage;
+use ratatui::Frame;
+use ratatui::crossterm::event::KeyEvent;
 pub use welcome::WelcomePage;
 
 use crate::app::AppCtx;
-use ratatui::Frame;
-use ratatui::crossterm::event::KeyEvent;
 
 // TODO: Make a better logo to replace this placeholder one
 pub const LOGO: &str = include_str!("../logo.txt");

@@ -3,12 +3,13 @@
     SPDX-FileCopyrightText: 2025 Shomy
 */
 mod app;
-mod pages;
 mod components;
-use app::App;
-use env_logger::Builder;
+mod pages;
 use std::fs::File;
 use std::io::Result;
+
+use app::App;
+use env_logger::Builder;
 
 #[tokio::main]
 async fn main() -> Result<()> {

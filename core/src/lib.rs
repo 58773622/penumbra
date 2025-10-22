@@ -9,5 +9,6 @@ pub mod error;
 pub mod exploit;
 pub mod utilities;
 
-pub use connection::port::{MTKPort, find_mtk_port};
 pub use core::device::Device;
+
+pub use connection::port::{MTKPort, find_mtk_port};

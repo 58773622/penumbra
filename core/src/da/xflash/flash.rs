@@ -2,11 +2,12 @@
     SPDX-License-Identifier: AGPL-3.0-or-later
     SPDX-FileCopyrightText: 2025 Shomy
 */
+use log::{debug, error, info};
+
 use crate::da::DAProtocol;
 use crate::da::xflash::XFlash;
 use crate::da::xflash::cmds::*;
 use crate::error::{Error, Result, XFlashError};
-use log::{debug, error, info};
 
 pub async fn read_flash<F>(
     xflash: &mut XFlash,
@@ -42,12 +43,7 @@ where
     param.extend_from_slice(&addr.to_le_bytes());
     param.extend_from_slice(&(size as u64).to_le_bytes());
     // Which basically means: append it! Improvements are welcome.
-    param.extend_from_slice(
-        &nand_ext
-            .iter()
-            .flat_map(|x| x.to_le_bytes())
-            .collect::<Vec<u8>>(),
-    );
+    param.extend_from_slice(&nand_ext.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>());
 
     xflash.send_cmd(Cmd::ReadData).await?;
 
@@ -119,11 +115,7 @@ pub async fn write_flash<F>(
 where
     F: FnMut(usize, usize),
 {
-    info!(
-        "Writing flash at address {:#X} with size {:#X}",
-        addr,
-        data.len()
-    );
+    info!("Writing flash at address {:#X} with size {:#X}", addr, data.len());
 
     // Note to self:
     // Next time, don't put this after Cmd::WriteData,
@@ -142,16 +134,10 @@ where
     actual_data.extend_from_slice(data);
     if actual_data.len() < size {
         actual_data.resize(size, 0);
-        debug!(
-            "Data to write at {:#X} was smaller than size, padding with zeros.",
-            addr
-        );
+        debug!("Data to write at {:#X} was smaller than size, padding with zeros.", addr);
     } else if actual_data.len() > size {
         actual_data.truncate(size);
-        debug!(
-            "Data to write at {:#X} was larger than size, truncating.",
-            addr
-        );
+        debug!("Data to write at {:#X} was larger than size, truncating.", addr);
     }
 
     let storage_type = 1u32; // TODO: Add support for other storage types
@@ -162,12 +148,7 @@ where
     param.extend_from_slice(&partition_type.to_le_bytes());
     param.extend_from_slice(&addr.to_le_bytes());
     param.extend_from_slice(&(size as u64).to_le_bytes());
-    param.extend_from_slice(
-        &nand_ext
-            .iter()
-            .flat_map(|x| x.to_le_bytes())
-            .collect::<Vec<u8>>(),
-    );
+    param.extend_from_slice(&nand_ext.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>());
 
     debug!("Sending write data cmd!");
     // TODO: Consider making a send_cmd_with_payload function
@@ -187,10 +168,7 @@ where
     let mut bytes_written = 0;
     let mut pos = 0;
 
-    debug!(
-        "Starting to write data in chunks of {} bytes...",
-        chunk_size
-    );
+    debug!("Starting to write data in chunks of {} bytes...", chunk_size);
     loop {
         if pos >= actual_data.len() {
             break;
@@ -209,14 +187,10 @@ where
         // And that's why here instead of doing the usual of sending the header (checksum included)
         // then the data, we need to send three different parts, with one being all zeros (why???).
         // But alas, who am I to judge, at least they didn't make an XML protocol... right?
-        xflash
-            .send(&0u32.to_be_bytes(), DataType::ProtocolFlow as u32)
-            .await?;
+        xflash.send(&0u32.to_be_bytes(), DataType::ProtocolFlow as u32).await?;
 
         debug!("Sending checksum {} for chunk {}", checksum, pos);
-        xflash
-            .send(&checksum.to_le_bytes(), DataType::ProtocolFlow as u32)
-            .await?;
+        xflash.send(&checksum.to_le_bytes(), DataType::ProtocolFlow as u32).await?;
 
         debug!("Sending chunk of {} bytes", chunk.len());
         xflash.send_data(chunk).await?;
@@ -258,13 +232,9 @@ pub async fn download(xflash: &mut XFlash, part_name: String, data: &[u8]) -> Re
 
     let data_len = data.len();
 
-    xflash
-        .send(part_name.as_bytes(), DataType::ProtocolFlow as u32)
-        .await?;
+    xflash.send(part_name.as_bytes(), DataType::ProtocolFlow as u32).await?;
 
-    xflash
-        .send(&data_len.to_le_bytes()[..], DataType::ProtocolFlow as u32)
-        .await?;
+    xflash.send(&data_len.to_le_bytes()[..], DataType::ProtocolFlow as u32).await?;
 
     let status = xflash.get_status().await?;
     if status != 0 {
@@ -272,14 +242,10 @@ pub async fn download(xflash: &mut XFlash, part_name: String, data: &[u8]) -> Re
     }
 
     // TODO: Figure out what this is actually? The same happens in write_flash
-    xflash
-        .send(&0u32.to_le_bytes(), DataType::ProtocolFlow as u32)
-        .await?;
+    xflash.send(&0u32.to_le_bytes(), DataType::ProtocolFlow as u32).await?;
 
     let checksum = data.iter().fold(0u32, |total, &byte| total + byte as u32) & 0xFFFF;
-    xflash
-        .send(&checksum.to_le_bytes(), DataType::ProtocolFlow as u32)
-        .await?;
+    xflash.send(&checksum.to_le_bytes(), DataType::ProtocolFlow as u32).await?;
 
     xflash.send(data, DataType::ProtocolFlow as u32).await?;
 
