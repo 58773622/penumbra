@@ -6,6 +6,10 @@ use log::debug;
 
 use crate::error::{Error, Result};
 
+/// Protocol used by the DA
+/// - Legacy: Old DA, used in old devices
+/// - V5 (XFlash): Used mainly in early Dimensity devices and most Helio devices
+/// - V6 (XML): Newest protocol, used in most recent Dimensity and Helio devices
 #[derive(Debug, Clone, PartialEq)]
 pub enum DAType {
     Legacy,
@@ -13,29 +17,50 @@ pub enum DAType {
     V6,
 }
 
+/// Represents a region within a DA entry
+/// Usually there are 3 regions:
+/// - Region 0: File Info (On XML Region 0 is the same as Region 1)
+/// - Region 1: First stage DA (DA1)
+/// - Region 2: Second stage DA (DA2)
 #[derive(Clone, Debug)]
 pub struct DAEntryRegion {
-    pub data: Vec<u8>,      // Raw data of the region, including signature if any
-    pub offset: u32,        // Offset within the file itself, where the region starts
-    pub length: u32,        // Length of the region
-    pub addr: u32,          // Address in which the region will be loaded in the device
-    pub region_offset: u32, // Same as offset, but without the signature (offset - sig_len)
-    pub sig_len: u32,       // Length of the signature, if any
+    /// Raw data of the region, including signature if any
+    pub data: Vec<u8>,
+    /// Offset within the file itself, where the region starts
+    pub offset: u32,
+    /// Length of the region
+    pub length: u32,
+    /// Address in which the region will be loaded in the device
+    pub addr: u32,
+    /// Same as length, minus the signature (offset - sig_len)
+    pub region_length: u32,
+    /// Length of the signature, if any
+    pub sig_len: u32,
 }
 
+/// Represents a Download Agent (DA) entry for a specific SoC
 #[derive(Clone, Debug)]
 pub struct DA {
+    /// Type of DA (Legacy, V5, V6)
     pub da_type: DAType,
+    /// Regions within the DA entry
     pub regions: Vec<DAEntryRegion>,
+    /// Magic number identifying the DA, always 0xDADA
     pub magic: u16,
+    /// Hardware code identifying the SoC. On XFlash DA this corresponds
+    /// to the "Commercial" name of the SoC (e.g., 0x6768 for Helio G85)
+    /// On XML and Legacy DA this corresponds to the actual hw_code
     pub hw_code: u16,
+    /// Always seems to be 0xCA00
     pub hw_sub_code: u16,
 }
 
+/// Represents a Download Agent (DA) file containing multiple DA entries
 pub struct DAFile {
-    // da_file_path: Path,
+    /// Raw data of the entire DA file
     pub da_raw_data: Vec<u8>,
     pub da_type: DAType,
+    /// List of DA entries for different SoCs
     pub das: Vec<DA>,
 }
 
@@ -117,7 +142,7 @@ impl DAFile {
                     offset,
                     length,
                     addr,
-                    region_offset: length - sig_len,
+                    region_length: length - sig_len,
                     sig_len,
                 });
                 current_region_offset += 20; // Move to the next region header
@@ -130,18 +155,43 @@ impl DAFile {
             );
         }
 
-        Ok(DAFile {
-            // da_file_path: Path::new(da_file_path).to_path_buf(),
-            da_raw_data: raw_data.to_vec(),
-            da_type,
-            das,
-        })
+        Ok(DAFile { da_raw_data: raw_data.to_vec(), da_type, das })
     }
 
     // TODO: Make an Hashmap, possibly also including other info about a chip
     pub fn get_da_from_hw_code(&self, hw_code: u16) -> Option<DA> {
         let da_code = match hw_code {
-            0x0707 => 0x6768,
+            0x279 => 0x6797,
+            0x321 => 0x6735,
+            0x326 => 0x6755,
+            0x335 => 0x6735,
+            0x337 => 0x6735,
+            0x507 => 0x6758,
+            0x551 => 0x6757,
+            0x562 => 0x6799,
+            0x601 => 0x6755,
+            0x633 => 0x6570,
+            0x688 => 0x6758,
+            0x690 => 0x6763,
+            0x699 => 0x6739,
+            0x707 => 0x6768,
+            0x717 => 0x6761,
+            0x725 => 0x6779,
+            0x766 => 0x6765,
+            0x788 => 0x6771,
+            0x813 => 0x6785,
+            0x816 => 0x6885,
+            0x886 => 0x6873,
+            0x908 => 0x8696,
+            0x930 => 0x8195,
+            0x950 => 0x6893,
+            0x959 => 0x6877,
+            0x989 => 0x6833,
+            0x996 => 0x6853,
+            0x1066 => 0x6781,
+            0x6583 => 0x6589,
+            0x8172 => 0x8173,
+            0x8176 => 0x8173,
             _ => hw_code,
         };
 
