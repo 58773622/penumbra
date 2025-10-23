@@ -118,7 +118,7 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn get_hw_code(&mut self) -> Result<u32> {
+    pub async fn get_hw_code(&mut self) -> Result<u16> {
         self.echo(&[Command::GetHwCode as u8], 1).await?;
 
         let mut hw_code = [0u8; 2];
@@ -133,7 +133,7 @@ impl Connection {
             return Err(Error::conn("GetHwCode failed"));
         }
 
-        Ok(u16::from_le_bytes(hw_code) as u32)
+        Ok(u16::from_be_bytes(hw_code))
     }
 
     pub async fn get_hw_sw_ver(&mut self) -> Result<(u16, u16, u16)> {
