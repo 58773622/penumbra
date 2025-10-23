@@ -136,7 +136,8 @@ impl UsbMTKPort {
 
             Ok(())
         })
-        .await?
+        .await
+        .map_err(|e| Error::io("Failed during CDC setup task"))?
     }
 
     pub fn from_device(device: Device<Context>) -> Option<Self> {
@@ -201,7 +202,7 @@ impl MTKPort for UsbMTKPort {
                                     "Failed to detach kernel driver on interface {}: {:?}",
                                     interface, e
                                 );
-                                return Err(Error::Io("Failed to detach kernel driver (USB)"));
+                                return Err(Error::io("Failed to detach kernel driver (USB)"));
                             }
                         }
                         Ok(false) => {}
@@ -210,21 +211,21 @@ impl MTKPort for UsbMTKPort {
                                 "Error checking kernel driver on interface {}: {:?}",
                                 interface, e
                             );
-                            return Err(Error::Io("Kernel driver check failed (USB)"));
+                            return Err(Error::io("Kernel driver check failed (USB)"));
                         }
                     }
                 }
 
                 if let Err(e) = handle.claim_interface(interface) {
                     error!("Failed to claim interface {}: {:?}", interface, e);
-                    return Err(Error::Io("Failed to claim interface (USB)"));
+                    return Err(Error::io("Failed to claim interface (USB)"));
                 }
             }
 
             Ok(())
         })
-        .await?
-        .map_err(|e| Error::Io("USB open task failed"));
+        .await
+        .map_err(|e| Error::io("USB open task failed"))?;
 
         #[cfg(target_os = "windows")]
         {
@@ -286,7 +287,7 @@ impl MTKPort for UsbMTKPort {
                     let locked = handle.blocking_lock();
                     match locked.read_bulk(endpoint, &mut temp_buf, timeout) {
                         Ok(n) => Ok((temp_buf, n)),
-                        Err(rusb::Error::Timeout) => Err(Error::Io("USB timeout")),
+                        Err(rusb::Error::Timeout) => Err(Error::io("USB timeout")),
                         Err(e) => Err(Error::io(e.to_string())),
                     }
                 }
@@ -320,14 +321,14 @@ impl MTKPort for UsbMTKPort {
                 let locked = handle.blocking_lock();
                 match locked.read_bulk(endpoint, &mut response, timeout) {
                     Ok(count) => Ok((response, count)),
-                    Err(e) => Err(Error::Io("Bulk read failed")),
+                    Err(e) => Err(Error::io("Bulk read failed")),
                 }
             })
             .await
-            .map_err(|e| Error::Io("USB bulk read task failed"))?;
+            .map_err(|e| Error::io("USB bulk read task failed"))??;
 
             if n == 0 {
-                return Err(Error::Io("USB returned 0 bytes"));
+                return Err(Error::io("USB returned 0 bytes"));
             }
 
             let expected = !startcmd[i] & 0xFF;
@@ -352,7 +353,7 @@ impl MTKPort for UsbMTKPort {
         tokio::task::spawn_blocking(move || {
             let locked = handle.blocking_lock();
             let res = locked.write_bulk(endpoint, &data, timeout);
-            res.map_err(|e| Error::Io("Bulk write failed"))
+            res.map_err(|e| Error::io("Bulk write failed"))
         })
         .await
         .unwrap()?;
